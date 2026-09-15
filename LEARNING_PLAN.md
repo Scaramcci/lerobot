@@ -1,9 +1,9 @@
 # LeRobot 三周学习计划：从公开数据到实机闭环
 
-> 适用对象：具身智能初学者，读过少量论文，但没有机器人项目经验  
-> 当前条件：Ubuntu 26.04、RTX 4090 Laptop、工作日每天 2–3 小时、周末每天 4–6 小时  
-> 实机条件：实验室有机械臂，预计一至两周后可以使用，具体型号待确认  
-> 官网版本：LeRobot `main` 文档  
+> 适用对象：具身智能初学者，读过少量论文，但没有机器人项目经验
+> 当前条件：Ubuntu 26.04、RTX 4090 Laptop、工作日每天 2–3 小时、周末每天 4–6 小时
+> 实机条件：实验室有机械臂，预计一至两周后可以使用，具体型号待确认
+> 官网版本：LeRobot `main` 文档
 > 目标周期：3 周完成，必要时使用第 4 周缓冲
 
 ## 1. 最终目标
@@ -33,21 +33,21 @@
 
 ### 2.1 必学内容
 
-| 顺序 | 官网位置 | 页面 | 学习深度 |
-|---:|---|---|---|
-| 1 | Get started → LeRobot | [LeRobot 首页](https://huggingface.co/docs/lerobot/main/index) | 精读 How It Works 和 Get Started |
-| 2 | Get started → Installation | [Installation](https://huggingface.co/docs/lerobot/main/installation) | 精读并完成源码安装、FFmpeg、CUDA 验证 |
-| 3 | Get started → Cheat sheet | [Cheat sheet](https://huggingface.co/docs/lerobot/main/cheat-sheet) | 浏览，作为命令索引，不背命令 |
-| 4 | Compute & Hardware → Compute Hardware Guide | [Compute Hardware Guide](https://huggingface.co/docs/lerobot/main/hardware_guide) | 精读显存、batch size、训练时长和 checkpoint 部分 |
-| 5 | Datasets → Using LeRobotDataset | [LeRobotDataset v3](https://huggingface.co/docs/lerobot/main/lerobot-dataset-v3) | 精读格式、加载、索引、时间窗口和 DataLoader |
-| 6 | Datasets → Using the Dataset Tools | [Dataset Tools](https://huggingface.co/docs/lerobot/main/using_dataset_tools) | 学会查看信息和可视化；其他操作先浏览 |
-| 7 | Policies → ACT | [ACT](https://huggingface.co/docs/lerobot/main/act) | 精读架构、训练和评估 |
-| 8 | Tutorials → Imitation Learning for Robots | [Imitation Learning for Robots](https://huggingface.co/docs/lerobot/main/il_robots) | 全文精读；这是实机阶段的主教程 |
-| 9 | Sensors → Cameras | [Cameras](https://huggingface.co/docs/lerobot/main/cameras) | 实机前精读找相机、配置和图像读取 |
-| 10 | Inference → Policy Deployment | [Policy Deployment](https://huggingface.co/docs/lerobot/main/inference) | 先学 Quick Start、Base strategy 和 Common Flags |
-| 11 | Robot Processors → Introduction | [Introduction to Processors](https://huggingface.co/docs/lerobot/main/introduction_processors) | 完成第一次训练后再读，理解数据流即可 |
-| 12 | Robot Processors → Action Representations | [Action Representations](https://huggingface.co/docs/lerobot/main/action_representations) | 理解 joint/EE、absolute/relative/delta 的区别 |
-| 13 | Robots → 对应机械臂 | [LeRobot 文档首页](https://huggingface.co/docs/lerobot/main/index)左侧的 Robots 栏目 | 只学习实验室实际使用的型号 |
+| 顺序 | 官网位置                                    | 页面                                                                                           | 学习深度                                         |
+| ----:| ------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| 1    | Get started → LeRobot                       | [LeRobot 首页](https://huggingface.co/docs/lerobot/main/index)                                 | 精读 How It Works 和 Get Started                 |
+| 2    | Get started → Installation                  | [Installation](https://huggingface.co/docs/lerobot/main/installation)                          | 精读并完成源码安装、FFmpeg、CUDA 验证            |
+| 3    | Get started → Cheat sheet                   | [Cheat sheet](https://huggingface.co/docs/lerobot/main/cheat-sheet)                            | 浏览，作为命令索引，不背命令                     |
+| 4    | Compute & Hardware → Compute Hardware Guide | [Compute Hardware Guide](https://huggingface.co/docs/lerobot/main/hardware_guide)              | 精读显存、batch size、训练时长和 checkpoint 部分 |
+| 5    | Datasets → Using LeRobotDataset             | [LeRobotDataset v3](https://huggingface.co/docs/lerobot/main/lerobot-dataset-v3)               | 精读格式、加载、索引、时间窗口和 DataLoader      |
+| 6    | Datasets → Using the Dataset Tools          | [Dataset Tools](https://huggingface.co/docs/lerobot/main/using_dataset_tools)                  | 学会查看信息和可视化；其他操作先浏览             |
+| 7    | Policies → ACT                              | [ACT](https://huggingface.co/docs/lerobot/main/act)                                            | 精读架构、训练和评估                             |
+| 8    | Tutorials → Imitation Learning for Robots   | [Imitation Learning for Robots](https://huggingface.co/docs/lerobot/main/il_robots)            | 全文精读；这是实机阶段的主教程                   |
+| 9    | Sensors → Cameras                           | [Cameras](https://huggingface.co/docs/lerobot/main/cameras)                                    | 实机前精读找相机、配置和图像读取                 |
+| 10   | Inference → Policy Deployment               | [Policy Deployment](https://huggingface.co/docs/lerobot/main/inference)                        | 先学 Quick Start、Base strategy 和 Common Flags  |
+| 11   | Robot Processors → Introduction             | [Introduction to Processors](https://huggingface.co/docs/lerobot/main/introduction_processors) | 完成第一次训练后再读，理解数据流即可             |
+| 12   | Robot Processors → Action Representations   | [Action Representations](https://huggingface.co/docs/lerobot/main/action_representations)      | 理解 joint/EE、absolute/relative/delta 的区别    |
+| 13   | Robots → 对应机械臂                         | [LeRobot 文档首页](https://huggingface.co/docs/lerobot/main/index)左侧的 Robots 栏目           | 只学习实验室实际使用的型号                       |
 
 ### 2.2 选学内容
 
@@ -90,12 +90,12 @@
 
 任务：
 
-- [ ] 用一句话解释 Teleoperate → Record → Train → Deploy。
-- [ ] 按官网源码安装方式建立隔离环境。
-- [ ] 安装 FFmpeg，并确认 `ffmpeg -version` 正常。
-- [ ] 确认 PyTorch 能识别 RTX 4090 Laptop。
-- [ ] 记录 Python、PyTorch、CUDA、NVIDIA Driver 和 LeRobot commit。
-- [ ] 运行一个小范围测试或 CLI `--help`，确认基本安装可用。
+- [x] 用一句话解释 Teleoperate → Record → Train → Deploy。
+- [x] 按官网源码安装方式建立隔离环境。
+- [x] 安装 FFmpeg，并确认 `ffmpeg -version` 正常。
+- [x] 确认 PyTorch 能识别 RTX 4090 Laptop。
+- [x] 记录 Python、PyTorch、CUDA、NVIDIA Driver 和 LeRobot commit。
+- [x] 运行一个小范围测试或 CLI `--help`，确认基本安装可用。
 
 验收：能够在项目环境中导入 `torch` 和 `lerobot`，并看到 CUDA 设备名称。
 
@@ -115,15 +115,15 @@
 
 任务：
 
-- [ ] 找到 `lerobot-train`、`lerobot-eval`、`lerobot-record` 的源码入口。
-- [ ] 找到 ACT 的配置类、Policy 类和注册位置。
-- [ ] 画一张不超过十个节点的仓库结构图。
+- [x] 找到 `lerobot-train`、`lerobot-eval`、`lerobot-record` 的源码入口。
+- [x] 找到 ACT 的配置类、Policy 类和注册位置。
+- [x] 画一张不超过十个节点的仓库结构图。
 
 验收：可以说明“一条训练命令从 CLI 进入后，大致会经过哪些模块”。
 
 ### Day 3：理解 LeRobotDataset（2–3 小时）
 
-官网：Datasets → [LeRobotDataset v3](https://huggingface.co/docs/lerobot/main/lerobot-dataset-v3)
+官网：Datasets → LeRobotDataset v3
 
 练习数据：[lerobot/pusht](https://huggingface.co/datasets/lerobot/pusht)
 
@@ -137,11 +137,11 @@
 
 任务：
 
-- [ ] 在线查看 PushT 的一个 episode。
-- [ ] 本地加载 metadata 和一个 sample。
-- [ ] 写下 sample 中每个 key 的名称、shape、dtype 和含义。
-- [ ] 解释为什么 episode 边界不能当成普通连续帧跨越。
-- [ ] 解释 observation 与 action 的时间对应关系。
+- [x] 在线查看 PushT 的一个 episode。
+- [x] 本地加载 metadata 和一个 sample。
+- [x] 写下 sample 中每个 key 的名称、shape、dtype 和含义。
+- [x] 解释为什么 episode 边界不能当成普通连续帧跨越。
+- [x] 解释 observation 与 action 的时间对应关系。
 
 验收：能够拿一个 batch，说明 batch 中每个张量代表什么。
 
@@ -158,10 +158,10 @@
 
 任务：
 
-- [ ] 使用官方 Dataset Visualizer 查看 PushT。
-- [ ] 使用 `lerobot-dataset-viz` 本地查看 episode 0。
-- [ ] 检查帧是否连续、动作是否合理、成功标记如何变化。
-- [ ] 写一页“训练前数据检查清单”。
+- [x] 使用官方 Dataset Visualizer 查看 PushT。
+- [x] 使用 `lerobot-dataset-viz` 本地查看 episode 0。
+- [x] 检查帧是否连续、动作是否合理、成功标记如何变化。
+- [x] 写一页“训练前数据检查清单”。
 
 验收：能够说出至少五个需要在训练前检查的数据质量问题。
 
@@ -312,7 +312,7 @@ Camera/Robot observation → preprocessor → select_action()
 - 控制计算机：`待确认`
 - 紧急停止方式：`待确认`
 
-如果官网没有该型号，查看 [Third-Party Robots & Teleoperators](https://huggingface.co/docs/lerobot/main/third_party_robots)。在确认型号、电机类型、电压和通信接口前，不执行电机配置命令。
+如果官网没有该型号，查看 [Third-Party Robots &amp; Teleoperators](https://huggingface.co/docs/lerobot/main/third_party_robots)。在确认型号、电机类型、电压和通信接口前，不执行电机配置命令。
 
 ### Session 1：连接、标定和遥操作（3–5 小时）
 
@@ -430,16 +430,16 @@ Camera/Robot observation → preprocessor → select_action()
 - 
 
 ## 下一步
-- 
+-
 ```
 
 ## 8. 实验记录模板
 
-| 实验 ID | 数据集 | Policy | Batch | Steps / Epochs | 训练耗时 | 峰值显存 | Eval episodes | 成功率 | 唯一改变量 |
-|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| exp-001 | lerobot/pusht | ACT |  |  |  |  |  |  | baseline |
-| exp-002 | lerobot/pusht | ACT |  |  |  |  |  |  |  |
-| exp-003 | 自采数据 | ACT |  |  |  |  | 10 |  | baseline |
+| 实验 ID | 数据集        | Policy | Batch | Steps / Epochs | 训练耗时 | 峰值显存 | Eval episodes | 成功率 | 唯一改变量 |
+| ------- | ------------- | ------ | -----:| --------------:| --------:| --------:| -------------:| ------:| ---------- |
+| exp-001 | lerobot/pusht | ACT    |       |                |          |          |               |        | baseline   |
+| exp-002 | lerobot/pusht | ACT    |       |                |          |          |               |        |            |
+| exp-003 | 自采数据      | ACT    |       |                |          |          | 10            |        | baseline   |
 
 ## 9. GitHub 中应保存与不应保存的内容
 
