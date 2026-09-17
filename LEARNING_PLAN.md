@@ -18,10 +18,10 @@
 
 完成后，应当能够：
 
-- [ ] 解释 observation、state、action、episode、task、FPS 的含义。
-- [ ] 说明 LeRobotDataset 如何保存视频、机器人状态和动作。
-- [ ] 使用公开数据训练并评估一个 ACT Policy。
-- [ ] 理解 action chunk，以及训练和推理阶段的基本数据流。
+- [x] 解释 observation、state、action、episode、task、FPS 的含义。
+- [x] 说明 LeRobotDataset 如何保存视频、机器人状态和动作。
+- [x] 使用公开数据训练并评估一个 ACT Policy。
+- [x] 理解 action chunk，以及训练和推理阶段的基本数据流。
 - [ ] 完成一种机械臂的连接、标定、遥操作和数据录制。
 - [ ] 用自己录制的数据训练 ACT，并完成至少 10 次实机测试。
 - [ ] 使用成功率、失败阶段和数据质量分析结果，而不是只看训练 loss。
@@ -190,13 +190,13 @@
 
 任务：
 
-- [ ] 先运行约 200 steps 的 smoke test。
-- [ ] 再完成一次约 5,000 steps 的正式 ACT 训练。
-- [ ] 保存至少两个中间 checkpoint。
-- [ ] 在 PushT 环境快速评估 20 个 episode。
-- [ ] 最终评估 50 个 episode。
-- [ ] 记录训练时长、峰值显存、loss 和成功率。
-- [ ] 至少改变一个变量做对照，例如训练步数或 batch size。
+- [x] 先运行约 200 steps 的 smoke test。
+- [x] 再完成一次约 5,000 steps 的正式 ACT 训练。
+- [x] 保存至少两个中间 checkpoint。
+- [x] 在 PushT 环境快速评估 20 个 episode。
+- [x] 最终评估 50 个 episode。
+- [x] 记录训练时长、峰值显存、loss 和成功率。
+- [x] 至少改变一个变量做对照，例如训练步数或 batch size。
 
 验收：得到可加载的 checkpoint、评估视频或日志，以及一张两组实验的对比表。
 
