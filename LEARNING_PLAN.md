@@ -1,277 +1,596 @@
-# LeRobot + PiperX 学习与首次实机实验计划
+# 从零开始完成 LeRobot + PiperX 实机项目
 
-> 适用对象：第一次做真实机械臂实验，已经能阅读少量论文和 Python 代码
->
-> 实验室硬件：松灵（PiperX）机械臂；具体控制器、末端夹具、通信方式和相机以现场盘点为准
->
-> 计算机：Ubuntu + RTX 4090 Laptop；工作日每天 2–3 小时，周末每天 4–6 小时
->
-> 建议周期：4 周主线 + 1 周缓冲。实机排期、驱动适配或安全审批延迟时，优先顺延，不压缩安全验证
+这不是一份只列主题的阅读清单，而是一份可以照着执行的入门教程。默认你会 Python、PyTorch 和基本深度学习，但没有学过机器人学、ROS、SLAM、相机、ACT，也没有操作过真实机械臂。不要因为暂时看不懂术语而跳过基础；实机实验中，知道“一个数代表什么、一个命令会让什么运动”比先跑出 loss 更重要。
 
-## 0. 这次要完成什么
+## 使用方法
 
-最终目标是一条可复现、可解释、可停止的闭环：
+每个阶段都按这个顺序进行：
+
+1. 阅读本阶段列出的官网页面，只读指定章节。
+2. 用自己的话写下术语和数据流，不要只复制文档。
+3. 执行命令或小实验，把终端输出、截图、配置和结论保存到 `notes/`。
+4. 对照“通过标准”。没有通过就停在本阶段，先解决问题。
+5. 进入下一阶段前，把本阶段产生的文件提交到 Git。
+
+建议周期为 8 周，每周工作日每天 2–3 小时、周末每天 4–6 小时。实验室排期不确定时，先完成离线部分；不要为了赶进度压缩安全测试。
+
+---
+
+## 总目标和最终成果
+
+你最终要完成的是下面这条闭环：
 
 ```text
-认识 PiperX 与安全边界
-  → 确认官方 SDK/ROS2/LeRobot 适配边界
-  → 读取状态并低速控制
-  → 遥操作采集数据
-  → 检查数据并训练 ACT
-  → 空载、低速、有人看护的实机推理
-  → 固定条件下评估、记录失败、迭代数据
+Linux/相机/机器人基础
+  → 安装 LeRobot
+  → 看懂 LeRobotDataset
+  → 在 PushT 仿真中训练 ACT
+  → 认识 PiperX 的驱动和安全边界
+  → 只读连接、低速控制、遥操作
+  → 采集并检查 PiperX 数据
+  → 训练自己的 ACT
+  → 分阶段部署到实机
+  → 10 次可复现评估和失败分析
 ```
 
-本轮结束时应能做到：
+最终应得到：
 
-- 说清 PiperX 的自由度、关节顺序、单位、限位、控制频率、通信协议和动作接口。
-- 在不运行策略的情况下，独立完成上电检查、连接、状态读取、停止和恢复。
-- 用遥操作完成一个极简单臂任务，并得到可加载、可视化、可 replay 的数据集。
-- 训练一个能在仿真/离线数据上正常工作的 ACT checkpoint。
-- 在明确的速度、空间和急停条件下完成至少 10 次实机评估。
-- 每次实验都有配置、数据集版本、checkpoint、环境条件和失败原因记录。
+- `notes/`：每一天的学习记录和问题答案。
+- `experiments/`：命令、配置、训练日志和评估表。
+- 一份 PushT ACT baseline。
+- 一份可加载、可视化、可 replay 的 PiperX 数据集。
+- 至少两个 PiperX policy checkpoint。
+- 一份至少 10 个 episode 的实机评估表和失败视频/日志索引。
+- 一份说明 PiperX 如何接入 LeRobot 的技术笔记。
 
-第一项实机任务只选一个：**把单个大号方块从固定起点夹起，放入固定容器**。先不做堆叠、连续物体、移动目标、双臂协作或长时间无人运行。
+第一项任务固定为：**把一个大号方块从固定区域抓起，放入旁边固定的容器**。初期不做堆叠、移动目标、双臂协作、长轨迹和无人值守。
 
-## 1. 先建立正确的判断方式
+---
 
-实机实验每次都要回答四个问题：
+## 第 0 周：建立最基本的机器人直觉
 
-1. 机器人现在是什么状态：上电、使能、当前姿态、是否有错误、是否有人看护？
-2. 这条命令会让哪个关节以什么单位、什么速度、什么控制模式运动？
-3. 如果动作异常，谁按急停，按下后如何断能、复位和确认没有残余运动？
-4. 结果如何保存：日志、视频、状态、动作、错误码和实验编号在哪里？
+### 0.1 你需要先理解的词
 
-涉及运动的命令，先用 `--help` 和官方示例确认参数，再在现场执行。计划中的 `<...>` 占位符没有填实前，不要复制执行。
+用自己的话写一页笔记，至少解释这些词：
 
-## 2. 必须先核实的 PiperX 信息
+| 词 | 你要理解的意思 |
+| --- | --- |
+| 关节（joint） | 机械臂中可以转动或移动的一节；每个关节通常有角度、速度、限位 |
+| 自由度（DOF） | 可以独立控制的运动数量；PiperX 的准确值要以手册为准 |
+| 末端执行器（end effector） | 机械臂末端的夹爪、吸盘或工具 |
+| joint space | 用每个关节的位置描述姿态 |
+| Cartesian/EE space | 用末端位置和方向描述姿态 |
+| 状态（state） | 机器人当前反馈，例如关节位置、速度、夹爪开度 |
+| 动作（action） | 发送给机器人要求它执行的控制量 |
+| 控制周期/FPS | 每秒读取或发送多少次；控制频率和相机 FPS 不一定相同 |
+| episode | 从一个初始状态开始到任务结束的一段完整轨迹 |
+| teleoperation | 人直接控制机器人，常用于采集示范数据 |
+| policy | 根据观察预测动作的模型 |
+| calibration | 建立传感器、关节零位、工具坐标和控制数值之间的对应关系 |
 
-仓库当前没有可确认的 `piperx` 原生机器人配置。PiperX 可能通过松灵官方 SDK、ROS/ROS2、串口、CAN、以太网或实验室自定义封装控制；不能根据 SO-101、OpenArm 或 Damiao 的命令猜测。第一周的产物是下面这张表，缺一项就标成“未知”，不要靠记忆补全。
+### 0.2 推荐的基础材料
 
-| 项目 | 现场填写 | 如何确认 |
+不要求一次学完整本教材，只看概念：
+
+- [Modern Robotics: Introduction](https://modernrobotics.northwestern.edu/chapters/chapter-1-introduction/)，看 Chapter 1 的 rigid body、configuration、degrees of freedom。
+- [Modern Robotics: Chapter 2](https://modernrobotics.northwestern.edu/chapters/chapter-2-spatial-velocities-and-twists/)，只看 frame、rotation、translation 的直觉。
+- [ROS 2 Documentation: Concepts](https://docs.ros.org/en/jazzy/Concepts.html)，只了解 node、topic、message、service、action；本计划不要求你先学会 ROS。
+- [OpenCV Python tutorials](https://docs.opencv.org/4.x/d6/d00/tutorial_py_root.html)，看读取摄像头、图像尺寸、颜色空间和保存图片。
+
+### 0.3 小练习
+
+- [ ] 用 Python/NumPy 画一个二维坐标系，说明 x、y、角度正方向。
+- [ ] 用 OpenCV 打开一张图片，打印 `shape`、`dtype`，保存一张缩放图。
+- [ ] 观看一段机械臂视频，指出“关节运动”“末端运动”“夹爪动作”。
+- [ ] 写 300 字说明：为什么“相机画面变了”不等于“机器人知道自己该怎么动”。
+
+通过标准：你能解释 state 和 action 的区别，并能读懂 `numpy.ndarray` 图像的高、宽、通道顺序。
+
+---
+
+## 第 1 周：安装环境和认识 LeRobot
+
+### Day 1：检查机器
+
+官网：
+
+- [Installation](https://huggingface.co/docs/lerobot/main/installation)
+- [Compute Hardware Guide](https://huggingface.co/docs/lerobot/main/hardware_guide)
+
+执行：
+
+```bash
+cd /home/scarramcci/Project/lerobot
+uv sync --locked --extra test --extra dev
+ffmpeg -version
+uv run python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+git rev-parse HEAD
+nvidia-smi
+```
+
+记录：Python、PyTorch、CUDA、NVIDIA Driver、GPU 显存、LeRobot commit。不要只写“能用”，把完整版本保存到 `notes/day01-environment.md`。
+
+通过标准：`torch.cuda.is_available()` 为 `True`，能导入 `lerobot`，知道 FFmpeg 用来做什么。
+
+### Day 2：第一次看 CLI
+
+官网：[Cheat sheet](https://huggingface.co/docs/lerobot/main/cheat-sheet)。
+
+```bash
+uv run lerobot-info --help
+uv run lerobot-train --help
+uv run lerobot-record --help
+uv run lerobot-teleoperate --help
+uv run lerobot-dataset-viz --help
+```
+
+你现在不需要记参数。请画出：
+
+```text
+命令行参数 → config dataclass → dataset/robot/policy → 输出日志或动作
+```
+
+阅读仓库：
+
+- `src/lerobot/scripts/`：命令入口。
+- `src/lerobot/configs/`：参数和配置。
+- `src/lerobot/datasets/`：数据集。
+- `src/lerobot/policies/`：模型。
+- `src/lerobot/robots/`、`cameras/`、`teleoperators/`：实机边界。
+
+通过标准：能指出 `lerobot-train`、`lerobot-record`、`lerobot-teleoperate` 分别负责什么。
+
+### Day 3：认识数据集
+
+官网：[LeRobotDataset v3](https://huggingface.co/docs/lerobot/main/lerobot-dataset-v3)，只读 format design、load dataset、episodes、timestamps、features。
+
+练习：
+
+- [ ] 找到一个公开 LeRobot 数据集，例如 `lerobot/pusht`。
+- [ ] 打印 metadata、episode 数、FPS、feature 名称和 shape。
+- [ ] 随机读取一个 sample，分别打印图像、state、action、task、timestamp。
+- [ ] 解释为什么不能跨 episode 取时间窗口。
+
+重点理解：训练样本不是一张独立图片，而是“某个 episode 中某个时间点的观察，以及之后要执行的动作”。
+
+通过标准：你能回答“模型输入是什么、监督标签是什么、它们的时间关系是什么”。
+
+### Day 4：认识相机
+
+官网：[Cameras](https://huggingface.co/docs/lerobot/main/cameras)。
+
+学习：USB 摄像头、RGB 图像、分辨率、FPS、曝光、白平衡、视野、遮挡、压缩和时间戳。
+
+练习：
+
+```bash
+uv run lerobot-find-cameras
+```
+
+如果当前没有相机，使用电脑摄像头或手机拍摄的视频完成练习。记录：
+
+- 相机设备索引和实际物理设备的对应关系。
+- `640x480` 与 `1280x720` 对显存和细节的影响。
+- 相机位置改变后，训练好的 policy 为什么可能失效。
+
+通过标准：你能从一帧画面判断相机是否看见目标、夹具和接触过程，并知道 FPS 不代表推理 FPS。
+
+### Day 5：认识训练入口
+
+官网：[Imitation Learning for Robots](https://huggingface.co/docs/lerobot/main/il_robots)，先看 introduction、train a policy 和 evaluation 的概念。
+
+阅读 `src/lerobot/scripts/lerobot_train.py`，只追踪：配置如何进入训练、dataset 如何加载、policy 如何创建、checkpoint 如何保存。不要试图读完所有模型代码。
+
+输出：`notes/day05-training-flow.md`，包含一张不超过 12 个节点的流程图。
+
+通过标准：能区分 dataset、policy、optimizer、checkpoint 和 evaluation。
+
+### 周末：安装验收
+
+- [ ] 运行项目中一组不依赖实机的快速测试：`uv run pytest tests -q --maxfail=1`；若依赖缺失，记录具体原因。
+- [ ] 建立 Git 分支或至少提交 `notes/day01` 到 `day05`。
+- [ ] 写一页“我还不理解的术语”，不要假装已经理解。
+
+---
+
+## 第 2 周：从零理解 ACT 和训练流程
+
+### Day 6：先补序列建模直觉
+
+复习：监督学习中的输入、标签、batch、epoch、train/eval、overfitting、normalization。
+
+把机器人任务写成序列：
+
+```text
+观察 o_t = 图像 + 机器人状态
+动作 a_t = 关节/末端的控制量
+数据 = (o_0, a_0), (o_1, a_1), ...
+```
+
+思考并记录：
+
+- 只用当前图像预测一步动作有什么问题？
+- 为什么动作需要连续而不能每帧随机跳动？
+- 为什么同一张图像可能对应不同动作？例如接近目标和离开目标。
+
+### Day 7：学习 ACT
+
+官网：[ACT](https://huggingface.co/docs/lerobot/main/act)，重点看 architecture、action chunking、training 和 inference。
+
+只需掌握这些直觉：
+
+- image encoder 把图像变成特征；
+- state 告诉模型当前关节/末端状态；
+- Transformer 根据观察预测一段未来动作，而不是只预测一个动作；
+- action chunk 可以减少逐帧抖动，但要求训练和部署的时间窗口一致；
+- `forward()` 用于训练并计算 loss，`select_action()` 用于部署时产生动作。
+
+画出：
+
+```text
+image_t + state_t → encoder/transformer → [a_t, a_t+1, ... a_t+K]
+```
+
+通过标准：不用公式也能说明 action chunk、训练 loss 和实机成功率为什么不是同一个指标。
+
+### Day 8：训练第一个 smoke test
+
+官网：[Train a policy](https://huggingface.co/docs/lerobot/main/il_robots#train-a-policy)。
+
+先使用公开 PushT 数据，设置很小的 steps，目标只是检查数据、模型、GPU 和 checkpoint 能否工作。执行前把完整命令保存到 `experiments/pusht-smoke/command.txt`。
+
+检查：
+
+- 程序是否找到数据集；
+- batch 中的图像和 state shape 是否正确；
+- loss 是否是有限数；
+- GPU 显存是否正常；
+- checkpoint 目录包含什么文件。
+
+### Day 9：理解 processor
+
+官网：[Introduction to Processors](https://huggingface.co/docs/lerobot/main/introduction_processors)。
+
+必须理解：
+
+- observation processor：机器人观测进入模型前的转换；
+- policy processor：模型输出变成机器人动作前的转换；
+- normalize、resize、batch、device、rename 的作用；
+- 训练和部署必须使用相同的约定。
+
+练习：追踪一个图像 key 从 dataset 到 policy 的名称、尺寸和 dtype 变化。
+
+### Day 10：动作表示
+
+官网：[Action Representations](https://huggingface.co/docs/lerobot/main/action_representations)。
+
+写表格比较：
+
+| 表示 | 例子 | 优点 | 风险 |
+| --- | --- | --- | --- |
+| 关节绝对位置 | 每个关节目标角度 | 直观 | 单位、零位和限位必须一致 |
+| 关节增量 | 当前角度加一个变化量 | 小动作较安全 | 累积误差和频率敏感 |
+| 末端位置/姿态 | x/y/z/旋转 | 任务直观 | 需要运动学和控制器支持 |
+
+暂时不要猜 PiperX 属于哪一种；标成“待 SDK 确认”。
+
+### 周末：PushT 正式 baseline
+
+- [ ] 完成一次 5,000 steps 左右的 ACT 训练，具体步数根据机器时间调整。
+- [ ] 保存至少两个 checkpoint、训练配置、loss 曲线和训练耗时。
+- [ ] 进行至少 20 个 episode 的评估。
+- [ ] 改变一个变量（例如 steps 或 batch size）再做一组对照。
+- [ ] 记录成功率、失败原因和显存峰值。
+
+通过标准：你能从命令行一路解释到 checkpoint，并能说明结果差异是由哪个变量造成的。
+
+---
+
+## 第 3 周：认识 PiperX，先学会安全地“不让它乱动”
+
+### Day 11：建立硬件档案
+
+仓库目前没有可确认的 `piperx` 原生配置，因此不能套用 SO-101 或其他机械臂命令。现场填写：
+
+| 项目 | 结果 | 证据位置 |
 | --- | --- | --- |
-| 精确型号/版本 | 待填写 | 铭牌、采购单、实验室 README |
-| 自由度、关节名称和顺序 | 待填写 | 说明书/SDK API/逐关节确认 |
-| 末端执行器与开合范围 | 待填写 | 夹具型号、行程、控制接口 |
-| 控制柜、电源电压、额定电流 | 待填写 | 铭牌和负责人确认；不要自行试接 |
-| 通信方式与设备名 | 待填写 | USB/串口/CAN/网口；记录设备名或 IP |
-| 官方 SDK、版本、示例 | 待填写 | 厂商文档和实验室已有代码 |
-| 位置/速度/力矩控制模式 | 待填写 | SDK 文档；确认默认模式 |
-| 反馈状态、单位、频率 | 待填写 | API 返回值和实际采样 |
-| 软限位/硬限位/碰撞检测 | 待填写 | 文档 + 低风险验证 |
-| 急停位置和断能行为 | 待填写 | 现场演示；写入操作卡 |
-| 遥操作设备和相机 | 待填写 | 现场盘点、相机工具 |
-| LeRobot 适配状态 | 待填写 | `src/lerobot/robots/`、官方 issue、实验室封装 |
+| 精确型号和固件 | 待填写 | 铭牌/截图 |
+| 自由度、关节顺序、单位 | 待填写 | 手册/SDK |
+| 控制柜、电源和额定参数 | 待填写 | 铭牌/负责人 |
+| 串口/CAN/以太网设备 | 待填写 | 系统信息 |
+| SDK/ROS2 包和版本 | 待填写 | 安装文件/命令 |
+| 位置、速度、力矩模式 | 待填写 | SDK 文档 |
+| 状态反馈字段和频率 | 待填写 | API 采样 |
+| 软限位、硬限位、碰撞检测 | 待填写 | 手册/验证 |
+| 末端夹具、遥操作设备 | 待填写 | 现场盘点 |
+| 急停、断能、故障恢复 | 待填写 | 负责人演示 |
 
-如果 PiperX 已有实验室控制脚本，先把它当作“硬件冒烟测试”使用；不要一开始就把它改造成 LeRobot Policy 接口。只有状态读取和单步动作都稳定后，才决定是复用现有适配、写一个 `Robot`/`Teleoperator` 适配，还是先离线转换数据。
+产出：`notes/piperx-inventory.md`。任何不知道的项目写“未知”，并写明询问谁。
 
-## 3. 官网学习范围
+### Day 12：只读连接
 
-主线阅读：[LeRobot 首页](https://huggingface.co/docs/lerobot/main/index)、[Installation](https://huggingface.co/docs/lerobot/main/installation)、[LeRobotDataset v3](https://huggingface.co/docs/lerobot/main/lerobot-dataset-v3)、[ACT](https://huggingface.co/docs/lerobot/main/act)、[Imitation Learning for Robots](https://huggingface.co/docs/lerobot/main/il_robots)、[Cameras](https://huggingface.co/docs/lerobot/main/cameras)、[Processors](https://huggingface.co/docs/lerobot/main/introduction_processors)、[Action Representations](https://huggingface.co/docs/lerobot/main/action_representations) 和 [Third-party robots](https://huggingface.co/docs/lerobot/main/third_party_robots)。
+目标：连接设备但不发送运动命令。
 
-先不学 RL、HIL-SERL、大型 VLA、多 GPU、异步推理和新 Policy 实现。第一次实机的瓶颈通常是接口、数据、相机和安全流程，不是模型规模。
+- [ ] 在断电状态下确认线缆和电源，不自行改变电压或总线参数。
+- [ ] 使用官方 SDK/实验室已有脚本读取状态。
+- [ ] 记录所有关节位置、速度、错误码、时间戳和采样频率。
+- [ ] 连续读取 5–10 分钟，统计丢包、延迟和时间戳是否单调。
+- [ ] 断开再连接，确认不会自动使能或突然运动。
 
-## 4. 第 1 周：软件、数据和硬件调查
+通过标准：你能解释每个返回字段，且重连失败时机器人保持安全状态。
 
-### Day 1：确认环境（2–3 小时）
+### Day 13：理解控制模式和限位
 
-- [ ] `uv sync --locked --extra test --extra dev`。
-- [ ] 检查 `ffmpeg -version` 和 CUDA；记录 Python、PyTorch、CUDA、驱动、LeRobot commit。
-- [ ] 运行 `lerobot-train --help`、`lerobot-record --help`、`lerobot-teleoperate --help`。
+在负责人陪同下确认：
 
-验收：能导入 `torch` 和 `lerobot`，并能解释每个 CLI 的输入输出。
+- 位置控制、速度控制、力矩控制的区别；
+- SDK 的角度单位是度还是弧度；
+- 发送的是目标位置还是增量；
+- 速度和加速度限制在哪里生效；
+- 软件停止、硬件急停和断电的区别。
 
-### Day 2：读代码和画数据流（2–3 小时）
+不要为了“试试看”关闭限位、碰撞检测或急停。
 
-```text
-LeRobotDataset → DataLoader → processor → ACT.forward/loss
-相机/机器人状态 → processor → policy.select_action
-policy action → processor → PiperX 控制接口
-```
+### Day 14：单关节空载低速
 
-- [ ] 找到 `src/lerobot/robots/robot.py`、`robots/config.py`、`scripts/lerobot_record.py`。
-- [ ] 找到 ACT 的 config、`forward()`、`select_action()` 和 checkpoint。
-- [ ] 写出 observation/state/action 的 key、shape、dtype、单位和时间关系。
+采用“一个关节、一个小动作、一次只改一个参数”的原则：
 
-### Day 3：PushT 基线（2–3 小时）
+1. 由负责人摆到安全姿态。
+2. 选择一个关节，记录初始反馈。
+3. 发送文档允许的最小动作。
+4. 观察方向、幅度、延迟、停止响应和反馈。
+5. 回到初始姿态，保存命令和结果。
 
-- [ ] 查看 `lerobot/pusht` 至少两个 episode 的 metadata、图像、动作和时间戳。
-- [ ] 完成 200 steps smoke test，再做一次短 ACT 训练。
-- [ ] 用 Dataset Visualizer 检查图像、动作、episode 边界和时间戳。
+停止条件：方向错、运动范围异常、抖动、噪声、过热、停止后继续运动、碰撞检测无效。
 
-### Day 4–5：PiperX 资料盘点（每天 2–3 小时）
+### Day 15：全臂遥操作，不录数据
 
-- [ ] 找到说明书、SDK、示例、错误码表和版本号。
-- [ ] 画出电脑 → 驱动/总线 → 控制柜 → 电机 → 反馈的控制链路。
-- [ ] 确认控制模式、关节顺序、单位、频率、限位、初始姿态和急停行为。
-- [ ] 询问负责人：哪些线缆能拔、哪些参数不能改、谁负责上电和故障复位。
-- [ ] 填完硬件表，并写一页“我仍然不知道什么”。
+- [ ] 先完成“回安全姿态—移动—停止—恢复”。
+- [ ] 逐关节验证正负方向和夹具开合。
+- [ ] 连续操作 10–20 分钟，观察温度、延迟、丢包和错误码。
+- [ ] 测试急停、软件停止、通信中断三种情况。
+- [ ] 写出从异常发生到恢复运行的具体步骤。
 
-周末验收：没有任何关键字段靠猜；能说明一条状态和动作从 PiperX 到 LeRobot 的路径。
+通过标准：你能在不使用 policy 的情况下稳定完成一次空载移动，并能明确什么时候必须按急停。
 
-## 5. 第 2 周：第一次接触实机，分级验证
+---
 
-实机阶段每次至少两人：一人操作电脑，一人站在急停和机械臂旁。第一次不要同时安装驱动、改参数、标定、开相机和录数据。每完成一级就保存日志，确认无误再进入下一级。
+## 第 4 周：相机、标定和遥操作数据
 
-### Level 0：场地和安全（30–60 分钟）
+### Day 16：相机入门和固定
 
-- [ ] 清空工作空间，固定桌面、相机、方块和容器，避免线缆受拉。
-- [ ] 人手、脸和身体不进入扫掠区；明确急停负责人和复位流程。
-- [ ] 由负责人确认上电/断电顺序；速度和加速度设为文档允许的低值。
-- [ ] 记录开始时间、操作者、硬件版本、软件 commit 和错误码。
+官网：[Cameras](https://huggingface.co/docs/lerobot/main/cameras)。
 
-停止条件：急停位置不清楚、有人进入危险区、线缆受拉、异味、异常声音、过热或错误码，立即停止并记录。
+现场确认：
 
-### Level 1：只读连接（1–2 小时）
+- 相机设备索引/序列号；
+- 分辨率、FPS、曝光、白平衡；
+- 相机是否固定，支架是否会被碰；
+- 画面是否同时看到物体、夹具和接触过程；
+- 是否有反光、遮挡、运动模糊和过曝。
 
-- [ ] 识别串口/CAN/网口设备；只执行官方状态查询或示例。
-- [ ] 读取全部关节位置、速度、错误状态和时间戳，不发送运动命令。
-- [ ] 连续记录 5–10 分钟，检查时间戳、频率、丢包和重连行为。
+不要在正式数据中途改变相机位置。相机位置、焦距、背景和光照都是数据的一部分。
 
-验收：有状态日志，知道每个字段的单位和异常范围；重连不会自动使能或突然运动。
+### Day 17：标定
 
-### Level 2：单关节/空载低速（1–2 小时）
+PiperX 的标定可能包含关节零位、工具坐标、夹具行程、相机外参或 SDK 内部参数。按松灵文档执行，不要使用 SO-101 的 `lerobot-calibrate` 命令代替。
 
-- [ ] 由负责人确认安全姿态和关节测试顺序，从一个关节开始。
-- [ ] 每次只发送极小、短时、可回退的动作；先位置，再按文档测试速度/力矩。
-- [ ] 验证正负方向、单位换算、反馈延迟、停止响应和软限位。
-- [ ] 保存“命令值—反馈值—实际现象”，一次只改一个参数。
+- [ ] 备份标定文件并记录路径。
+- [ ] 记录每个关节的零位和允许范围。
+- [ ] 记录末端工具坐标、夹具开合范围。
+- [ ] 标定后用只读和低速测试确认姿态没有突然偏移。
 
-停止条件：方向错误、距离异常、抖动、回零漂移、停止后仍运动、碰撞检测不工作。
+### Day 18：录制前练习
 
-### Level 3：全臂遥操作（2–3 小时）
+官网：[Record a dataset](https://huggingface.co/docs/lerobot/main/il_robots#record-a-dataset)。
 
-- [ ] 不录数据，只完成回安全姿态、移动、停止、恢复。
-- [ ] 逐关节确认方向和夹具开合；记录操作者容易误操作的动作。
-- [ ] 连续遥操作 10–20 分钟，观察延迟、丢包、温度、电流和错误码。
-- [ ] 测试急停、软件停止、通信断开三种情况，并记录恢复流程。
+只做 3 次不保存练习：
 
-验收：操作者能不用策略稳定完成一次空载移动；另一人能在异常时及时停止。
+1. 回到相同起始姿态。
+2. 接近方块。
+3. 闭合夹具并确认抓住。
+4. 移到容器上方。
+5. 打开夹具并回到安全姿态。
 
-## 6. 第 2 周末：相机、标定和第一批数据
+记录完成任务需要多少秒、哪些动作容易犹豫、相机是否能看清关键阶段。
 
-### 相机先于任务
+### Day 19：三个测试 episode
 
-- [ ] 用 `lerobot-find-cameras` 或系统工具确认设备；固定支架、焦距和视角。
-- [ ] 画面同时覆盖目标、夹具和关键接触过程；不要只追求画面好看。
-- [ ] 固定分辨率、FPS、曝光和白平衡，记录位置、距离和光照。
-- [ ] 检查图像与状态时间戳是否同步，是否有黑帧、丢帧、模糊。
+- [ ] 录 3 个 episode。
+- [ ] 立即用 `lerobot-dataset-viz` 或官网可视化工具检查。
+- [ ] replay 前确认机器人在安全姿态、速度低、急停有人看守。
+- [ ] 检查视频、state、action、timestamp、task 是否都有。
 
-### 标定和数据采集
+发现黑帧、丢帧、动作错位、状态维度错或 replay 不安全时，停止录制并修复，不要继续凑数量。
 
-PiperX 的标定可能包含关节零位、工具坐标、相机外参、夹具行程或 SDK 参数。先按松灵/实验室文档执行，确认标定文件位置并备份；不要用 SO-101 校准命令替代。
+### Day 20：正式采集
 
-1. [ ] 先做 3 次不保存的练习，找到安全起始、抓取和放置姿态。
-2. [ ] 录 3 个测试 episode，立即可视化并 replay；发现时间戳或动作错误就停止扩充。
-3. [ ] 正式录 30–50 个 episode，每个约 20–30 秒，起始和目标变化小而真实。
-4. [ ] 每 10 个 episode 检查磁盘、视频、状态和动作，不要录完才发现相机没写入。
-5. [ ] 标记失败原因：遮挡、夹取失败、碰撞、犹豫、通信问题或任务失败。
+录 30–50 个高质量 episode。前 10 个后检查一次，之后每 10 个检查一次。每个 episode 约 20–30 秒，保持相同任务描述和动作节奏，但覆盖少量合理变化：物体位置、起始姿态、接近角度。
 
-训练前门槛：每个 episode 都有完整图像、状态、动作、时间戳和任务文本；动作没有越过安全范围；数据能加载、可视化和 replay；明显失败样本已删除或单独分组。
+训练前门槛：
 
-## 7. 第 3 周：训练、部署和第一次评估
+- 每个 episode 有完整图像、状态、动作、时间戳和任务文本；
+- 没有越过安全动作范围；
+- 明显失败样本单独标记；
+- 数据能加载、可视化和 replay；
+- 能说清 state/action 的关节顺序和单位。
 
-### 训练前
+---
 
-- [ ] 用短 smoke test 验证 feature key、shape、dtype、FPS 和 normalization。
-- [ ] 根据总帧数、batch size 和显存估算训练时间；保存配置文件和 commit。
-- [ ] 先训练短 checkpoint，再训练正式版本；至少保存两个 checkpoint。
-- [ ] 记录训练 loss、离线指标、显存、耗时和数据集版本。
+## 第 5 周：用 PiperX 数据训练 ACT
 
-### 部署前的五层检查
+### Day 21：数据审计
 
-1. **模型**：checkpoint 能加载，processor 一致，输出维度等于 PiperX 动作维度。
-2. **数据**：输入图像 key、尺寸、归一化和 state 顺序完全一致。
-3. **控制**：单位、关节顺序、绝对/增量表示、限位和频率已确认。
-4. **空间**：先无物体、空载、安全姿态；设置低速度和动作幅度上限。
-5. **人员**：两人到位，急停可触达，明确谁观察、谁停止、何时停止。
+官网：[Using Dataset Tools](https://huggingface.co/docs/lerobot/main/using_dataset_tools)。
 
-任何一层不确定，都回到只读或遥操作测试，不进入策略推理。
+逐项检查：
 
-### 分阶段部署
+- episode 数和总帧数；
+- 相机 FPS 与机器人状态 FPS；
+- 图像分辨率和 dtype；
+- action 的最小值、最大值、均值和异常尖峰；
+- 每个 episode 的长度；
+- 任务文字是否一致；
+- 是否存在跨 episode 的时间窗口。
 
-- [ ] **A 离线回放**：只看模型预测，不发送给机械臂；检查动作曲线连续性和超限。
-- [ ] **B 影子模式**：读取实时图像和状态，计算并记录动作，机器人保持不动。
-- [ ] **C 空载低速**：不放物体执行短轨迹，观察方向、延迟、抖动和停止。
-- [ ] **D 有物体单次**：只放一个方块，成功或失败后立即停止并检查日志。
-- [ ] **E 固定条件评估**：完成 10 次，记录成功、失败阶段、异常、人工干预和耗时。
+产出 `experiments/piperx-v1/data-audit.md` 和一张数据质量表。
 
-评估表至少包含：`episode_id`、初始姿态、物体位置、成功与否、失败阶段（接近/抓取/搬运/放置）、是否急停、推理 FPS、通信错误、备注和视频路径。成功率不能替代失败分析。
+### Day 22：smoke test
 
-## 8. 第 4 周：针对性改进
+先用极短训练确认：
 
-一次只改一个主要变量：
+- policy 输入 feature 与 PiperX 数据一致；
+- action 输出维度正确；
+- normalization 能加载；
+- loss 是有限数；
+- checkpoint 可以重新加载。
 
-- 抓取失败：补录不同接近角度、夹具开合和物体位置；检查相机是否看清接触。
-- 搬运抖动：检查动作表示、时间戳、控制频率、action chunk 和速度限制。
-- 放置失败：补录目标边界和最后接触动作，确认目标没有超出训练分布。
-- 只在某些光照/位置失败：先扩大数据覆盖，再考虑模型或相机变化。
-- 通信或停止异常：停止训练和评估，修复控制链路后重复 Level 1–3。
+smoke test 失败时不要直接增加显存或 steps，先检查 key、shape、dtype、单位、关节顺序和 processor。
 
-改进后重新录制针对性数据，训练第二版 checkpoint，用同样的 10-episode 条件评估。最终报告要回答：改了什么、为什么改、指标如何变、是否引入新安全或稳定性问题。
+### Day 23–24：正式训练
 
-## 9. 每次实机实验的操作卡
+- [ ] 保存完整配置和实际命令。
+- [ ] 保存至少两个 checkpoint。
+- [ ] 记录训练步数、耗时、显存、loss 和数据版本。
+- [ ] 固定一个验证集或固定若干 episode 做离线比较。
 
-### 开始前
+不要用训练 loss 直接宣称“机器人学会了”。离线模型能复现示范动作，不代表它能处理相机延迟、初始位置变化和真实摩擦。
 
-- [ ] 检查场地、线缆、夹具、急停、速度限制和人员位置。
-- [ ] 记录实验 ID、日期、操作者、硬件/软件版本、数据集/模型版本。
-- [ ] 上电后先读状态和错误码，不直接发送策略动作。
-- [ ] 确认机器人处于预期模式和安全姿态。
+### Day 25：离线动作检查
 
-### 运行中
+在不连接机械臂的情况下：
 
-- [ ] 只做当前阶段允许的动作；不要临时改多个参数。
-- [ ] 出现异响、过热、抖动、失联、超限或人进入危险区，立即停止。
-- [ ] 记录发生前的命令、屏幕日志、错误码和动作阶段。
+- 输入录制视频和状态；
+- 运行 `select_action()`；
+- 画出每个关节的预测曲线；
+- 检查是否有尖峰、跳变、超限和不合理夹具动作；
+- 比较示范动作与预测动作的时间对齐。
 
-### 结束后
+通过标准：没有任何动作会在数值上越过已确认的 PiperX 安全范围。
 
-- [ ] 回到安全姿态，按规定顺序停止、失能和断电。
-- [ ] 保存日志、视频、状态、动作、配置和备注；不要只保存成功视频。
-- [ ] 立即写下“现象—推测—证据—下一步”。
+---
 
-## 10. 学习与实验记录模板
+## 第 6 周：分阶段部署到 PiperX
+
+部署前必须两人到场：一人操作电脑，一人站在急停旁。任何一个检查不通过都停止。
+
+### 阶段 A：模型加载，不连接动作
+
+确认 checkpoint、processor、数据统计、模型输出维度和 PiperX 控制接口一致。只打印动作，不发送。
+
+### 阶段 B：影子模式
+
+读取实时图像和状态，运行模型并记录预测动作，机器人保持不动。检查实时输入是否与训练数据同分布，推理 FPS 是否稳定。
+
+### 阶段 C：空载低速
+
+不放方块，只在安全姿态附近执行极短动作。设置速度、加速度和动作幅度上限。观察方向、延迟、抖动、停止响应和异常恢复。
+
+### 阶段 D：单次有物体测试
+
+只放一个方块，完成一次后停止检查日志。失败也要保存视频和状态，不要连续重试掩盖问题。
+
+### 阶段 E：固定条件评估
+
+完成 10 个 episode，记录：
+
+| 字段 | 说明 |
+| --- | --- |
+| episode_id | 唯一编号 |
+| 初始姿态/物体位置 | 评估条件 |
+| 成功 | 0/1，预先定义成功标准 |
+| 失败阶段 | 接近、抓取、搬运、放置 |
+| 人工干预/急停 | 是否发生、原因 |
+| 推理 FPS/通信错误 | 系统稳定性 |
+| 视频和日志路径 | 可复查证据 |
+
+成功标准必须在实验前写好，例如“方块完全进入容器且夹具回到安全姿态”。不要看到结果后再改标准。
+
+---
+
+## 第 7 周：失败分析和第二版数据
+
+按失败阶段决定下一步：
+
+- **接近失败**：检查相机视角、初始位置覆盖、坐标/单位和动作平滑性。
+- **抓取失败**：补录接近角度、夹具开合和接触过程；检查夹具状态是否进入 observation。
+- **搬运抖动**：检查控制频率、action chunk、时间戳、增量/绝对动作表示。
+- **放置失败**：补录容器边界和最后放置动作；检查目标是否超出训练分布。
+- **通信/急停异常**：停止模型迭代，修复控制链路后重新完成第 3 周 Level 1–3。
+
+只改一个主要变量。补录 10–20 个针对性 episode，训练第二版 policy，用完全相同的 10-episode 条件对比第一版和第二版。
+
+最终报告至少包含：
+
+1. 硬件和软件版本；
+2. 数据集组成和质量检查；
+3. policy、batch、steps、checkpoint；
+4. 两版成功率；
+5. 每类失败的数量和视频索引；
+6. 下一轮最值得改的一件事。
+
+---
+
+## 第 8 周：整理成可复现项目
+
+- [ ] 把所有命令整理成 `experiments/*/command.txt`。
+- [ ] 把配置、数据集 repo、checkpoint 路径和 commit 写入实验表。
+- [ ] 补齐 `notes/` 中没有回答的问题。
+- [ ] 画最终数据流：相机/状态 → processor → policy → action → PiperX。
+- [ ] 写一页“如果换一台电脑，如何从零复现实验”。
+- [ ] 只提交代码、配置、日志摘要和获许可的小图，不提交 token、完整视频、HF cache、checkpoint 或未经许可的实验室图像。
+
+---
+
+## 每日学习记录模板
 
 ```markdown
-# YYYY-MM-DD / exp-XXX
+# YYYY-MM-DD / Day XX
 
-## 硬件与环境
-- PiperX 型号/固件：
-- 控制器/通信接口：
-- 相机与 FPS：
-- 急停负责人：
-- LeRobot commit / SDK 版本：
+## 今天阅读
+- 官网页面：
+- 章节：
+- 新术语：
 
-## 本次目标
-- 当前阶段（只读/单关节/遥操作/录制/影子/推理）：
-- 允许的速度、范围和停止条件：
+## 今天执行
+- 命令/脚本：
+- 输入：
+- 输出路径：
 
-## 执行与结果
-- 命令或脚本：
-- 数据集/checkpoint：
-- 观察到的现象：
-- 错误码/日志路径：
-- 成功或失败及阶段：
+## 我现在能解释
+-
 
-## 反思
-- 我原来以为：
-- 实际看到：
-- 证据：
-- 下次只改一个变量：
+## 观察到的证据
+-
+
+## 仍然不懂或不确定
+-
+
+## 明天只做的一件事
+-
 ```
 
-## 11. GitHub 与最终验收
+## 每次实机操作卡
 
-提交学习计划、笔记、配置、分析脚本、实验表和小尺寸示例图。不要提交 checkpoint、完整视频、HF 缓存、token、密码、未经许可的实验室图像或设备内部信息；数据和模型放在获许可的存储或 Hugging Face Hub。
+开始前：检查场地、线缆、夹具、急停、速度限制、人员位置、模型版本和当前错误码。
 
-最终验收：
+运行中：只做当前阶段允许的动作；出现异响、过热、抖动、失联、超限或人进入危险区，立即停止。
 
-- [ ] PiperX 硬件和控制链路表完整，未知项有负责人和下一步。
-- [ ] 完成 Level 0–3，并保存只读、低速、遥操作证据。
-- [ ] 有一份可视化、可 replay 的自采数据集。
-- [ ] 有 ACT smoke test、正式训练和至少两个 checkpoint。
-- [ ] 完成影子模式、空载低速和至少 10 次固定条件实机评估。
-- [ ] 能解释每次失败发生在哪里，以及下一次数据或控制要改什么。
+结束后：回安全姿态，按负责人规定停止/失能/断电；保存日志、视频、状态、动作和备注；立即写下“现象—推测—证据—下一步”。
 
-完成这些后，再决定学习 SmolVLA、Diffusion Policy、RL 或实现 PiperX 的更完整 LeRobot 适配。第一次实机实验的质量，首先由安全、可观测性、数据一致性和复现能力决定。
+## 最终自测问题
+
+完成后不看文档回答：
+
+1. observation、state、action、task、episode 分别是什么？
+2. 为什么 episode 边界不能跨越？
+3. 相机 FPS、机器人状态频率和 policy 推理频率有什么区别？
+4. ACT 的 action chunk 解决什么问题，又引入什么要求？
+5. `forward()` 和 `select_action()` 有什么区别？
+6. 为什么训练 loss 下降不代表实机成功率上升？
+7. PiperX 的一个 action 数值具体代表什么单位和控制目标？
+8. 影子模式为什么要放在真正发送动作之前？
+9. 发生抖动、失联或急停后，分别如何停止和恢复？
+10. 如果抓取阶段总失败，下一轮应优先检查相机、数据、动作表示还是模型？为什么？
+
+能够回答这些问题，并完成 10 次固定条件实机评估，才算完成第一次 LeRobot 项目。此后再学习 SmolVLA、Diffusion Policy、RL 或把 PiperX 做成正式的 LeRobot 原生适配。
